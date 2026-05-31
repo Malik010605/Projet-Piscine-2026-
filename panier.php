@@ -50,20 +50,42 @@ $total = 0;
             <th>Element</th>
             <th>Choix</th>
             <th>Prix</th>
+            <th>Action</th>
           </tr>
-          <?php foreach ($panier as $item) { ?>
+          <?php foreach ($panier as $index => $item) { ?>
             <?php $total = $total + $item["prix"]; ?>
             <tr class="panier-item">
               <td><?php echo htmlspecialchars($item["type"]); ?></td>
               <td><?php echo htmlspecialchars($item["nom"]); ?></td>
               <td><?php echo htmlspecialchars($item["prix"]); ?> euros</td>
+              <td>
+                <form method="post" action="Fichiers PHP/traitement_panier.php">
+                  <input type="hidden" name="index_panier" value="<?php echo htmlspecialchars($index); ?>">
+                  <button type="submit" name="retirer_panier">Retirer</button>
+                </form>
+              </td>
             </tr>
           <?php } ?>
         </table>
 
         <p><strong>Total estimé :</strong> <?php echo $total; ?> euros</p>
 
+        <form method="post" action="Fichiers PHP/traitement_panier.php">
+          <button type="submit" name="vider_panier" data-confirm="Vider le panier ?">Vider le panier</button>
+        </form>
+
         <form method="post" action="Fichiers PHP/traitement_reservation.php" id="reservationForm">
+          <h3>Paiement simulé</h3>
+
+          <label for="nom_carte">Nom du titulaire :</label>
+          <input type="text" id="nom_carte" name="nom_carte" required>
+
+          <label for="numero_carte">Numéro de carte :</label>
+          <input type="text" id="numero_carte" name="numero_carte" minlength="12" maxlength="19" required>
+
+          <label for="expiration">Expiration :</label>
+          <input type="month" id="expiration" name="expiration" required>
+
           <button type="submit" name="valider_reservation">Valider la réservation</button>
         </form>
       <?php } else { ?>
