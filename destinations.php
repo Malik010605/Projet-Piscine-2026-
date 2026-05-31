@@ -1,49 +1,162 @@
 <?php
+header("Content-Type: text/html; charset=UTF-8");
 require_once "Fichiers PHP/config.php";
 
+function e($texte) {
+  return htmlspecialchars($texte, ENT_QUOTES, "UTF-8");
+}
+
+function cheminImageDestination($image) {
+  $nomImage = basename($image);
+
+  if ($nomImage == "") {
+    $nomImage = "destination-paris.png";
+  }
+
+  return "assets/images/" . $nomImage;
+}
+
+$recherche = isset($_GET["recherche"]) ? trim($_GET["recherche"]) : "";
+$categorie = isset($_GET["categorie"]) ? trim($_GET["categorie"]) : "";
+$tri = isset($_GET["tri"]) ? trim($_GET["tri"]) : "nom";
+$ordreSql = "nom ASC";
+
+if ($tri == "prix_asc") {
+  $ordreSql = "prix_base ASC";
+} elseif ($tri == "prix_desc") {
+  $ordreSql = "prix_base DESC";
+}
+
 $destinations = array();
-$categories = array();
-$recherche = isset($_GET["recherche"]) ? $_GET["recherche"] : "";
-$categorie = isset($_GET["categorie"]) ? $_GET["categorie"] : "";
+$categories = array("Culture", "Gastronomie", "Mer");
 
 if ($conn) {
-  $resultat_categories = mysqli_query($conn, "SELECT DISTINCT categorie FROM destinations WHERE statut = 'validee' ORDER BY categorie");
-  if ($resultat_categories) {
-    while ($ligne = mysqli_fetch_assoc($resultat_categories)) {
-      $categories[] = $ligne;
+  $resultatCategories = mysqli_query($conn, "SELECT DISTINCT categorie FROM destinations WHERE statut = 'validee' ORDER BY categorie");
+
+  if ($resultatCategories) {
+    $categories = array();
+
+    while ($ligne = mysqli_fetch_assoc($resultatCategories)) {
+      $categories[] = $ligne["categorie"];
     }
   }
 
-  if (!empty($recherche) && !empty($categorie)) {
-    $sql = "SELECT id, nom, categorie, description, prix_base, image FROM destinations WHERE statut = 'validee' AND (nom LIKE ? OR description LIKE ?) AND categorie = ? ORDER BY nom";
+  if ($recherche != "" && $categorie != "") {
+    $sql = "SELECT id, nom, categorie, description, prix_base, image
+            FROM destinations
+            WHERE statut = 'validee'
+            AND (nom LIKE ? OR description LIKE ?)
+            AND categorie = ?
+            ORDER BY " . $ordreSql;
     $stmt = mysqli_prepare($conn, $sql);
-    $recherche_like = "%" . $recherche . "%";
-    mysqli_stmt_bind_param($stmt, "sss", $recherche_like, $recherche_like, $categorie);
+    $rechercheLike = "%" . $recherche . "%";
+    mysqli_stmt_bind_param($stmt, "sss", $rechercheLike, $rechercheLike, $categorie);
     mysqli_stmt_execute($stmt);
     $resultat = mysqli_stmt_get_result($stmt);
-  } elseif (!empty($recherche)) {
-    $sql = "SELECT id, nom, categorie, description, prix_base, image FROM destinations WHERE statut = 'validee' AND (nom LIKE ? OR description LIKE ?) ORDER BY nom";
+  } elseif ($recherche != "") {
+    $sql = "SELECT id, nom, categorie, description, prix_base, image
+            FROM destinations
+            WHERE statut = 'validee'
+            AND (nom LIKE ? OR description LIKE ?)
+            ORDER BY " . $ordreSql;
     $stmt = mysqli_prepare($conn, $sql);
-    $recherche_like = "%" . $recherche . "%";
-    mysqli_stmt_bind_param($stmt, "ss", $recherche_like, $recherche_like);
+    $rechercheLike = "%" . $recherche . "%";
+    mysqli_stmt_bind_param($stmt, "ss", $rechercheLike, $rechercheLike);
     mysqli_stmt_execute($stmt);
     $resultat = mysqli_stmt_get_result($stmt);
-  } elseif (!empty($categorie)) {
-    $sql = "SELECT id, nom, categorie, description, prix_base, image FROM destinations WHERE statut = 'validee' AND categorie = ? ORDER BY nom";
+  } elseif ($categorie != "") {
+    $sql = "SELECT id, nom, categorie, description, prix_base, image
+            FROM destinations
+            WHERE statut = 'validee'
+            AND categorie = ?
+            ORDER BY " . $ordreSql;
     $stmt = mysqli_prepare($conn, $sql);
     mysqli_stmt_bind_param($stmt, "s", $categorie);
     mysqli_stmt_execute($stmt);
     $resultat = mysqli_stmt_get_result($stmt);
   } else {
-    $sql = "SELECT id, nom, categorie, description, prix_base, image FROM destinations WHERE statut = 'validee' ORDER BY nom";
+    $sql = "SELECT id, nom, categorie, description, prix_base, image
+            FROM destinations
+            WHERE statut = 'validee'
+            ORDER BY " . $ordreSql;
     $resultat = mysqli_query($conn, $sql);
   }
 
-  if ($resultat) {
+  if (isset($resultat) && $resultat) {
     while ($ligne = mysqli_fetch_assoc($resultat)) {
       $destinations[] = $ligne;
     }
   }
+}
+
+if (count($destinations) == 0 && $recherche == "" && $categorie == "") {
+  $destinations = array(
+    array("id" => 1, "nom" => "Paris", "categorie" => "Culture", "description" => "Séjour culturel autour des musées, monuments et quartiers historiques.", "prix_base" => "320.00", "image" => "destination-paris.png"),
+    array("id" => 2, "nom" => "Nice", "categorie" => "Mer", "description" => "Séjour détente entre bord de mer, vieille ville et activités en extérieur.", "prix_base" => "410.00", "image" => "destination-nice.png"),
+    array("id" => 3, "nom" => "Lyon", "categorie" => "Gastronomie", "description" => "Week-end découverte autour de la ville, des visites et des restaurants.", "prix_base" => "280.00", "image" => "destination-lyon.png")
+  );
+}
+
+$champRecherche = '<input type="text" id="recherche" name="recherche" placeholder="Exemple : Paris" value="' . e($recherche) . '">';
+
+$selectCategories = '<select id="categorie" name="categorie">';
+$selectCategories .= '<option value="">Toutes les catégories</option>';
+
+foreach ($categories as $cat) {
+  $selected = "";
+
+  if ($categorie == $cat) {
+    $selected = " selected";
+  }
+
+  $selectCategories .= '<option value="' . e($cat) . '"' . $selected . '>' . e($cat) . '</option>';
+}
+
+$selectCategories .= '</select>';
+
+$selectTri = '<select id="tri" name="tri">';
+$optionsTri = array(
+  "nom" => "Nom",
+  "prix_asc" => "Prix croissant",
+  "prix_desc" => "Prix décroissant"
+);
+
+foreach ($optionsTri as $valeur => $texte) {
+  $selected = "";
+
+  if ($tri == $valeur) {
+    $selected = " selected";
+  }
+
+  $selectTri .= '<option value="' . e($valeur) . '"' . $selected . '>' . e($texte) . '</option>';
+}
+
+$selectTri .= '</select>';
+
+$catalogueHtml = "";
+
+foreach ($destinations as $destination) {
+  $id = isset($destination["id"]) ? $destination["id"] : 0;
+  $nom = isset($destination["nom"]) ? $destination["nom"] : "";
+  $cat = isset($destination["categorie"]) ? $destination["categorie"] : "";
+  $description = isset($destination["description"]) ? $destination["description"] : "";
+  $prix = isset($destination["prix_base"]) ? $destination["prix_base"] : "0.00";
+  $image = isset($destination["image"]) ? cheminImageDestination($destination["image"]) : "assets/images/destination-paris.png";
+
+  $catalogueHtml .= '<article>';
+  $catalogueHtml .= '<img class="card-image" src="' . e($image) . '" alt="Vue de ' . e($nom) . '">';
+  $catalogueHtml .= '<span class="tag">' . e($cat) . '</span>';
+  $catalogueHtml .= '<h3>' . e($nom) . '</h3>';
+  $catalogueHtml .= '<p>' . e($description) . '</p>';
+  $catalogueHtml .= '<p><strong>Prix indicatif :</strong> ' . e($prix) . ' euros</p>';
+  $catalogueHtml .= '<p><a class="button-link" href="destination.php?id=' . e($id) . '">Voir le détail</a></p>';
+  $catalogueHtml .= '</article>';
+}
+
+$messageRecherche = "";
+
+if (count($destinations) == 0) {
+  $messageRecherche = '<p class="info-box">Aucune destination ne correspond à la recherche.</p>';
 }
 ?>
 
@@ -87,17 +200,13 @@ if ($conn) {
 
       <form method="get" action="destinations.php">
         <label for="recherche">Rechercher une destination :</label>
-        <input type="text" id="recherche" name="recherche" placeholder="Exemple : Paris" value="<?php echo htmlspecialchars($recherche); ?>">
+        <?php echo $champRecherche; ?>
 
         <label for="categorie">Catégorie :</label>
-        <select id="categorie" name="categorie">
-          <option value="">Toutes les categories</option>
-          <?php foreach ($categories as $cat) { ?>
-            <option value="<?php echo htmlspecialchars($cat["categorie"]); ?>" <?php if ($categorie == $cat["categorie"]) { echo "selected"; } ?>>
-              <?php echo htmlspecialchars($cat["categorie"]); ?>
-            </option>
-          <?php } ?>
-        </select>
+        <?php echo $selectCategories; ?>
+
+        <label for="tri">Trier par :</label>
+        <?php echo $selectTri; ?>
 
         <button type="submit">Rechercher</button>
       </form>
@@ -107,21 +216,10 @@ if ($conn) {
       <h2>Catalogue</h2>
 
       <div class="card-list">
-        <?php foreach ($destinations as $destination) { ?>
-          <article>
-            <img class="card-image" src="assets/images/<?php echo htmlspecialchars($destination["image"]); ?>" alt="Vue de <?php echo htmlspecialchars($destination["nom"]); ?>">
-            <span class="tag"><?php echo htmlspecialchars($destination["categorie"]); ?></span>
-            <h3><?php echo htmlspecialchars($destination["nom"]); ?></h3>
-            <p><?php echo htmlspecialchars($destination["description"]); ?></p>
-            <p><strong>Prix indicatif :</strong> <?php echo htmlspecialchars($destination["prix_base"]); ?> euros</p>
-            <p><a class="button-link" href="destination.php?id=<?php echo $destination["id"]; ?>">Voir le détail</a></p>
-          </article>
-        <?php } ?>
+        <?php echo $catalogueHtml; ?>
       </div>
 
-      <?php if (count($destinations) == 0) { ?>
-        <p class="info-box">Aucune destination ne correspond à la recherche.</p>
-      <?php } ?>
+      <?php echo $messageRecherche; ?>
     </section>
   </main>
 
