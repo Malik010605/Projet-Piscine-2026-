@@ -5,6 +5,7 @@ require_once "Fichiers PHP/config.php";
 $utilisateurs = array();
 $reservations = array();
 $prestations = array();
+$destinations = array();
 $message_admin = isset($_SESSION["message_admin"]) ? $_SESSION["message_admin"] : "";
 unset($_SESSION["message_admin"]);
 
@@ -17,14 +18,29 @@ function afficherStatut($statut) {
     return "à vérifier";
   }
 
+  if ($statut == "annulee") {
+    return "annulée";
+  }
+
+  if ($statut == "supprimee") {
+    return "supprimée";
+  }
+
   return str_replace("_", " ", $statut);
 }
 
 if ($conn) {
-  $resultat = mysqli_query($conn, "SELECT nom, prenom, email, role FROM utilisateurs ORDER BY nom");
+  $resultat = mysqli_query($conn, "SELECT id, nom, prenom, email, role FROM utilisateurs ORDER BY nom");
   if ($resultat) {
     while ($ligne = mysqli_fetch_assoc($resultat)) {
       $utilisateurs[] = $ligne;
+    }
+  }
+
+  $resultat = mysqli_query($conn, "SELECT id, nom, categorie, description, prix_base, image, statut FROM destinations ORDER BY nom");
+  if ($resultat) {
+    while ($ligne = mysqli_fetch_assoc($resultat)) {
+      $destinations[] = $ligne;
     }
   }
 
@@ -92,38 +108,125 @@ if ($conn) {
     <?php } ?>
 
     <section>
+      <h2>Ajouter une destination</h2>
+      <p>Cette partie permet d'ajouter rapidement une nouvelle offre visible dans le catalogue.</p>
+
+      <form method="post" action="Fichiers PHP/traitement_admin.php">
+        <label for="nom_destination">Nom :</label>
+        <input type="text" id="nom_destination" name="nom" required>
+
+        <label for="categorie_destination">Catégorie :</label>
+        <input type="text" id="categorie_destination" name="categorie" placeholder="Culture, mer, gastronomie..." required>
+
+        <label for="description_destination">Description :</label>
+        <textarea id="description_destination" name="description" required></textarea>
+
+        <label for="prix_destination">Prix indicatif :</label>
+        <input type="number" id="prix_destination" name="prix_base" min="0" step="0.01" required>
+
+        <label for="image_destination">Nom du fichier image :</label>
+        <input type="text" id="image_destination" name="image" value="destination-paris.png" required>
+
+        <button type="submit" name="ajouter_destination">Ajouter la destination</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Gestion des destinations</h2>
+      <div class="card-list">
+        <?php foreach ($destinations as $destination) { ?>
+          <article>
+            <form method="post" action="Fichiers PHP/traitement_admin.php">
+              <input type="hidden" name="destination_id" value="<?php echo htmlspecialchars($destination["id"]); ?>">
+
+              <label>Nom :</label>
+              <input type="text" name="nom" value="<?php echo htmlspecialchars($destination["nom"]); ?>" required>
+
+              <label>Catégorie :</label>
+              <input type="text" name="categorie" value="<?php echo htmlspecialchars($destination["categorie"]); ?>" required>
+
+              <label>Description :</label>
+              <textarea name="description" required><?php echo htmlspecialchars($destination["description"]); ?></textarea>
+
+              <label>Prix :</label>
+              <input type="number" name="prix_base" min="0" step="0.01" value="<?php echo htmlspecialchars($destination["prix_base"]); ?>" required>
+
+              <label>Image :</label>
+              <input type="text" name="image" value="<?php echo htmlspecialchars($destination["image"]); ?>" required>
+
+              <label>Statut :</label>
+              <select name="statut">
+                <option value="validee" <?php if ($destination["statut"] == "validee") { echo "selected"; } ?>>Validée</option>
+                <option value="a_verifier" <?php if ($destination["statut"] == "a_verifier") { echo "selected"; } ?>>À vérifier</option>
+                <option value="supprimee" <?php if ($destination["statut"] == "supprimee") { echo "selected"; } ?>>Supprimée</option>
+              </select>
+
+              <p><strong>État actuel :</strong> <?php echo htmlspecialchars(afficherStatut($destination["statut"])); ?></p>
+
+              <button type="submit" name="modifier_destination">Modifier</button>
+              <button type="submit" name="supprimer_destination" data-confirm="Supprimer cette destination du catalogue ?">Supprimer</button>
+            </form>
+          </article>
+        <?php } ?>
+      </div>
+    </section>
+
+    <section>
       <h2>Utilisateurs</h2>
       <table>
         <tr>
           <th>Nom</th>
           <th>Email</th>
           <th>Rôle</th>
+          <th>Action</th>
         </tr>
         <?php foreach ($utilisateurs as $utilisateur) { ?>
           <tr>
             <td><?php echo htmlspecialchars($utilisateur["prenom"] . " " . $utilisateur["nom"]); ?></td>
             <td><?php echo htmlspecialchars($utilisateur["email"]); ?></td>
             <td><?php echo htmlspecialchars($utilisateur["role"]); ?></td>
+            <td>
+              <form method="post" action="Fichiers PHP/traitement_admin.php">
+                <input type="hidden" name="utilisateur_id" value="<?php echo htmlspecialchars($utilisateur["id"]); ?>">
+                <select name="role">
+                  <option value="voyageur" <?php if ($utilisateur["role"] == "voyageur") { echo "selected"; } ?>>Voyageur</option>
+                  <option value="prestataire" <?php if ($utilisateur["role"] == "prestataire") { echo "selected"; } ?>>Prestataire</option>
+                  <option value="admin" <?php if ($utilisateur["role"] == "admin") { echo "selected"; } ?>>Admin</option>
+                </select>
+                <button type="submit" name="modifier_role">Changer le rôle</button>
+              </form>
+            </td>
           </tr>
         <?php } ?>
       </table>
     </section>
 
     <section>
-      <h2>Reservations</h2>
+      <h2>Réservations</h2>
       <table>
         <tr>
           <th>Client</th>
           <th>Destination</th>
           <th>Total</th>
           <th>Statut</th>
+          <th>Action</th>
         </tr>
         <?php foreach ($reservations as $reservation) { ?>
           <tr>
-            <td><?php echo htmlspecialchars($reservation["client"] ? $reservation["client"] : "Invite"); ?></td>
+            <td><?php echo htmlspecialchars($reservation["client"] ? $reservation["client"] : "Invité"); ?></td>
             <td><?php echo htmlspecialchars($reservation["destination"]); ?></td>
             <td><?php echo htmlspecialchars($reservation["total"]); ?> euros</td>
             <td><?php echo htmlspecialchars(afficherStatut($reservation["statut"])); ?></td>
+            <td>
+              <?php if ($reservation["statut"] != "annulee") { ?>
+                <form method="post" action="Fichiers PHP/traitement_admin.php">
+                  <input type="hidden" name="reservation_id" value="<?php echo htmlspecialchars($reservation["id"]); ?>">
+                  <button type="submit" name="annuler_reservation" data-confirm="Annuler cette réservation ?">Annuler</button>
+                </form>
+              <?php } else { ?>
+                <span>Déjà annulée</span>
+              <?php } ?>
+            </td>
           </tr>
         <?php } ?>
       </table>
@@ -144,10 +247,14 @@ if ($conn) {
             <td><?php echo htmlspecialchars($prestation["nom_prestataire"] . " - " . $prestation["destination"]); ?></td>
             <td><?php echo htmlspecialchars(afficherStatut($prestation["statut"])); ?></td>
             <td>
-              <form method="post" action="Fichiers PHP/traitement_admin.php">
-                <input type="hidden" name="prestation_id" value="<?php echo htmlspecialchars($prestation["id"]); ?>">
-                <button type="submit" name="verifier">Vérifier</button>
-              </form>
+              <?php if ($prestation["statut"] != "validee") { ?>
+                <form method="post" action="Fichiers PHP/traitement_admin.php">
+                  <input type="hidden" name="prestation_id" value="<?php echo htmlspecialchars($prestation["id"]); ?>">
+                  <button type="submit" name="verifier">Vérifier</button>
+                </form>
+              <?php } else { ?>
+                <span>Validée</span>
+              <?php } ?>
             </td>
           </tr>
         <?php } ?>
