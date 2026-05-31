@@ -6,10 +6,16 @@ $error = "";
 $total = 0;
 
 if (isset($_POST["valider_reservation"])) {
+  $nom_carte = isset($_POST["nom_carte"]) ? trim($_POST["nom_carte"]) : "";
+  $numero_carte = isset($_POST["numero_carte"]) ? preg_replace("/[^0-9]/", "", $_POST["numero_carte"]) : "";
+  $expiration = isset($_POST["expiration"]) ? trim($_POST["expiration"]) : "";
+
   if (!isset($_SESSION["panier"]) || count($_SESSION["panier"]) == 0) {
     $error = "Le panier est vide.<br>";
   } elseif (!$conn) {
     $error = "Connexion à la base de données impossible.<br>";
+  } elseif ($nom_carte == "" || strlen($numero_carte) < 12 || $expiration == "") {
+    $error = "Les informations de paiement simulé sont incomplètes.<br>";
   } else {
     foreach ($_SESSION["panier"] as $item) {
       $total = $total + $item["prix"];
@@ -27,6 +33,40 @@ if (isset($_POST["valider_reservation"])) {
 
     if ($destination_id <= 0 || empty($date_depart)) {
       $error = "Les informations du séjour sont incomplètes.<br>";
+    }
+  }
+
+  if ($error == "") {
+    $sql = "UPDATE transports SET places = places - ? WHERE id = ? AND places >= ?";
+    $stmt = mysqli_prepare($conn, $sql);
+    mysqli_stmt_bind_param($stmt, "iii", $personnes, $transport_id, $personnes);
+    mysqli_stmt_execute($stmt);
+
+    if (mysqli_stmt_affected_rows($stmt) == 0) {
+      $error = "Le transport n'a plus assez de places disponibles.<br>";
+    }
+  }
+
+  if ($error == "") {
+    $disponible = 0;
+    $sql = "UPDATE hebergements SET disponible = ? WHERE id = ? AND disponible = 1";
+    $stmt = mysqli_prepare($conn, $sql);
+    mysqli_stmt_bind_param($stmt, "ii", $disponible, $hebergement_id);
+    mysqli_stmt_execute($stmt);
+
+    if (mysqli_stmt_affected_rows($stmt) == 0) {
+      $error = "L'hébergement n'est plus disponible.<br>";
+    }
+  }
+
+  if ($error == "" && $activite_id) {
+    $sql = "UPDATE activites SET places = places - ? WHERE id = ? AND places >= ?";
+    $stmt = mysqli_prepare($conn, $sql);
+    mysqli_stmt_bind_param($stmt, "iii", $personnes, $activite_id, $personnes);
+    mysqli_stmt_execute($stmt);
+
+    if (mysqli_stmt_affected_rows($stmt) == 0) {
+      $error = "L'activité n'a plus assez de places disponibles.<br>";
     }
   }
 
