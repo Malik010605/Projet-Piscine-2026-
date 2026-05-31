@@ -1,16 +1,62 @@
 <?php
+header("Content-Type: text/html; charset=UTF-8");
 require_once "Fichiers PHP/config.php";
+
+function e($texte) {
+  return htmlspecialchars($texte, ENT_QUOTES, "UTF-8");
+}
+
+function cheminImageDestination($image) {
+  $nomImage = basename($image);
+
+  if ($nomImage == "") {
+    $nomImage = "destination-paris.png";
+  }
+
+  return "assets/images/" . $nomImage;
+}
 
 $id = isset($_GET["id"]) ? (int) $_GET["id"] : 0;
 $destination = null;
 
 if ($conn && $id > 0) {
-  $sql = "SELECT id, nom, categorie, description, prix_base, image FROM destinations WHERE id = ? AND statut = 'validee'";
+  $sql = "SELECT id, nom, categorie, description, prix_base, image
+          FROM destinations
+          WHERE id = ? AND statut = 'validee'";
   $stmt = mysqli_prepare($conn, $sql);
   mysqli_stmt_bind_param($stmt, "i", $id);
   mysqli_stmt_execute($stmt);
   $resultat = mysqli_stmt_get_result($stmt);
   $destination = mysqli_fetch_assoc($resultat);
+}
+
+$contenuDestination = "";
+
+if ($destination) {
+  $nom = $destination["nom"];
+  $categorie = $destination["categorie"];
+  $description = $destination["description"];
+  $prix = $destination["prix_base"];
+  $image = cheminImageDestination($destination["image"]);
+
+  $contenuDestination .= '<span class="tag">' . e($categorie) . '</span>';
+  $contenuDestination .= '<h2>' . e($nom) . '</h2>';
+  $contenuDestination .= '<img class="detail-image" src="' . e($image) . '" alt="Vue de ' . e($nom) . '">';
+  $contenuDestination .= '<p>' . e($description) . '</p>';
+  $contenuDestination .= '<table>';
+  $contenuDestination .= '<tr><th>Information</th><th>Valeur</th></tr>';
+  $contenuDestination .= '<tr><td>Catégorie</td><td>' . e($categorie) . '</td></tr>';
+  $contenuDestination .= '<tr><td>Prix indicatif</td><td>' . e($prix) . ' euros</td></tr>';
+  $contenuDestination .= '<tr><td>Remarque</td><td>Les transports, hébergements et activités se choisissent dans la page Mon séjour.</td></tr>';
+  $contenuDestination .= '</table>';
+  $contenuDestination .= '<p>';
+  $contenuDestination .= '<a class="button-link" href="sejour.php?destination=' . e($id) . '">Composer un séjour</a> ';
+  $contenuDestination .= '<a class="second-link" href="destinations.php">Retour aux destinations</a>';
+  $contenuDestination .= '</p>';
+} else {
+  $contenuDestination .= '<h2>Destination introuvable</h2>';
+  $contenuDestination .= '<p class="error">Aucune destination valide n\'a été trouvée.</p>';
+  $contenuDestination .= '<p><a class="button-link" href="destinations.php">Retour aux destinations</a></p>';
 }
 ?>
 
@@ -49,40 +95,7 @@ if ($conn && $id > 0) {
 
   <main>
     <section>
-      <?php if ($destination) { ?>
-        <span class="tag"><?php echo htmlspecialchars($destination["categorie"]); ?></span>
-        <h2><?php echo htmlspecialchars($destination["nom"]); ?></h2>
-        <img class="detail-image" src="assets/images/<?php echo htmlspecialchars($destination["image"]); ?>" alt="Vue de <?php echo htmlspecialchars($destination["nom"]); ?>">
-        <p><?php echo htmlspecialchars($destination["description"]); ?></p>
-
-        <table>
-          <tr>
-            <th>Information</th>
-            <th>Valeur</th>
-          </tr>
-          <tr>
-            <td>Catégorie</td>
-            <td><?php echo htmlspecialchars($destination["categorie"]); ?></td>
-          </tr>
-          <tr>
-            <td>Prix indicatif</td>
-            <td><?php echo htmlspecialchars($destination["prix_base"]); ?> euros</td>
-          </tr>
-          <tr>
-            <td>Remarque</td>
-            <td>Les transports, hebergements et activites se choisissent dans la page Mon séjour.</td>
-          </tr>
-        </table>
-
-        <p>
-          <a class="button-link" href="sejour.php?destination=<?php echo $id; ?>">Composer un séjour</a>
-          <a class="second-link" href="destinations.php">Retour aux destinations</a>
-        </p>
-      <?php } else { ?>
-        <h2>Destination introuvable</h2>
-        <p class="error">Aucune destination valide n'a été trouvée.</p>
-        <p><a class="button-link" href="destinations.php">Retour aux destinations</a></p>
-      <?php } ?>
+      <?php echo $contenuDestination; ?>
     </section>
   </main>
 
