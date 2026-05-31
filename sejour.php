@@ -1,5 +1,10 @@
 <?php
+header("Content-Type: text/html; charset=UTF-8");
 require_once "Fichiers PHP/config.php";
+
+function e($texte) {
+  return htmlspecialchars($texte, ENT_QUOTES, "UTF-8");
+}
 
 $destinationChoisie = isset($_GET["destination"]) ? (int) $_GET["destination"] : 0;
 $destinations = array();
@@ -36,6 +41,51 @@ if ($conn) {
     }
   }
 }
+
+$selectDestinations = '<select id="destination" name="destination" required>';
+$selectDestinations .= '<option value="">Choisir une destination</option>';
+
+foreach ($destinations as $destination) {
+  $selected = "";
+
+  if ($destinationChoisie == $destination["id"]) {
+    $selected = " selected";
+  }
+
+  $selectDestinations .= '<option value="' . e($destination["nom"]) . '"' . $selected . '>' . e($destination["nom"]) . '</option>';
+}
+
+$selectDestinations .= '</select>';
+
+$selectTransports = '<select id="transport" name="transport" required>';
+$selectTransports .= '<option value="">Choisir un transport</option>';
+
+foreach ($transports as $transport) {
+  $texte = $transport["type_transport"] . " vers " . $transport["destination"];
+  $selectTransports .= '<option value="' . e($transport["type_transport"]) . '">' . e($texte) . '</option>';
+}
+
+$selectTransports .= '</select>';
+
+$selectHebergements = '<select id="hebergement" name="hebergement" required>';
+$selectHebergements .= '<option value="">Choisir un hébergement</option>';
+
+foreach ($hebergements as $hebergement) {
+  $texte = $hebergement["nom"] . " - " . $hebergement["destination"];
+  $selectHebergements .= '<option value="' . e($hebergement["nom"]) . '">' . e($texte) . '</option>';
+}
+
+$selectHebergements .= '</select>';
+
+$selectActivites = '<select id="activite" name="activite">';
+$selectActivites .= '<option value="">Aucune activité</option>';
+
+foreach ($activites as $activite) {
+  $texte = $activite["nom"] . " - " . $activite["destination"];
+  $selectActivites .= '<option value="' . e($activite["nom"]) . '">' . e($texte) . '</option>';
+}
+
+$selectActivites .= '</select>';
 ?>
 
 <!DOCTYPE html>
@@ -74,48 +124,20 @@ if ($conn) {
   <main>
     <section>
       <h2>Choix du séjour</h2>
-      <p>Ce formulaire prepare les choix du voyageur à partir des éléments enregistrés dans la base.</p>
+      <p>Ce formulaire prépare les choix du voyageur à partir des éléments enregistrés dans la base.</p>
 
       <form method="post" action="Fichiers PHP/traitement_panier.php">
         <label for="destination">Destination :</label>
-        <select id="destination" name="destination" required>
-          <option value="">Choisir une destination</option>
-          <?php foreach ($destinations as $destination) { ?>
-            <option value="<?php echo htmlspecialchars($destination["nom"]); ?>" <?php if ($destinationChoisie == $destination["id"]) { echo "selected"; } ?>>
-              <?php echo htmlspecialchars($destination["nom"]); ?>
-            </option>
-          <?php } ?>
-        </select>
+        <?php echo $selectDestinations; ?>
 
         <label for="transport">Transport :</label>
-        <select id="transport" name="transport" required>
-          <option value="">Choisir un transport</option>
-          <?php foreach ($transports as $transport) { ?>
-            <option value="<?php echo htmlspecialchars($transport["type_transport"]); ?>">
-              <?php echo htmlspecialchars($transport["type_transport"] . " vers " . $transport["destination"]); ?>
-            </option>
-          <?php } ?>
-        </select>
+        <?php echo $selectTransports; ?>
 
         <label for="hebergement">Hébergement :</label>
-        <select id="hebergement" name="hebergement" required>
-          <option value="">Choisir un hébergement</option>
-          <?php foreach ($hebergements as $hebergement) { ?>
-            <option value="<?php echo htmlspecialchars($hebergement["nom"]); ?>">
-              <?php echo htmlspecialchars($hebergement["nom"] . " - " . $hebergement["destination"]); ?>
-            </option>
-          <?php } ?>
-        </select>
+        <?php echo $selectHebergements; ?>
 
         <label for="activite">Activité :</label>
-        <select id="activite" name="activite">
-          <option value="">Aucune activité</option>
-          <?php foreach ($activites as $activite) { ?>
-            <option value="<?php echo htmlspecialchars($activite["nom"]); ?>">
-              <?php echo htmlspecialchars($activite["nom"] . " - " . $activite["destination"]); ?>
-            </option>
-          <?php } ?>
-        </select>
+        <?php echo $selectActivites; ?>
 
         <label for="personnes">Nombre de personnes :</label>
         <input type="number" id="personnes" name="personnes" value="1" min="1" required>
@@ -128,7 +150,7 @@ if ($conn) {
     </section>
 
     <section class="info-box">
-      <h2>Regles simples prevues</h2>
+      <h2>Règles simples prévues</h2>
       <p>Les dates, les places disponibles et la cohérence entre destination, transport, hébergement et activité seront contrôlées dans les traitements PHP.</p>
     </section>
   </main>
