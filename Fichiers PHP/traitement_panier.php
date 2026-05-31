@@ -12,7 +12,7 @@ function chercherDestination($conn, $nom) {
 }
 
 function chercherTransport($conn, $type, $destination_id) {
-  $sql = "SELECT id, prix FROM transports WHERE type_transport = ? AND destination_id = ? LIMIT 1";
+  $sql = "SELECT id, prix, places, date_depart FROM transports WHERE type_transport = ? AND destination_id = ? LIMIT 1";
   $stmt = mysqli_prepare($conn, $sql);
   mysqli_stmt_bind_param($stmt, "si", $type, $destination_id);
   mysqli_stmt_execute($stmt);
@@ -21,7 +21,7 @@ function chercherTransport($conn, $type, $destination_id) {
 }
 
 function chercherHebergement($conn, $nom, $destination_id) {
-  $sql = "SELECT id, prix_nuit FROM hebergements WHERE nom = ? AND destination_id = ? AND disponible = 1";
+  $sql = "SELECT id, prix_nuit, capacite FROM hebergements WHERE nom = ? AND destination_id = ? AND disponible = 1";
   $stmt = mysqli_prepare($conn, $sql);
   mysqli_stmt_bind_param($stmt, "si", $nom, $destination_id);
   mysqli_stmt_execute($stmt);
@@ -30,7 +30,7 @@ function chercherHebergement($conn, $nom, $destination_id) {
 }
 
 function chercherActivite($conn, $nom, $destination_id) {
-  $sql = "SELECT id, prix FROM activites WHERE nom = ? AND destination_id = ?";
+  $sql = "SELECT id, prix, places, date_activite FROM activites WHERE nom = ? AND destination_id = ?";
   $stmt = mysqli_prepare($conn, $sql);
   mysqli_stmt_bind_param($stmt, "si", $nom, $destination_id);
   mysqli_stmt_execute($stmt);
@@ -45,6 +45,30 @@ $activite = "";
 $personnes = 1;
 $date_depart = "";
 $error = "";
+
+if (isset($_POST["retirer_panier"])) {
+  $index = isset($_POST["index_panier"]) ? (int) $_POST["index_panier"] : -1;
+
+  if (isset($_SESSION["panier"][$index])) {
+    unset($_SESSION["panier"][$index]);
+    $_SESSION["panier"] = array_values($_SESSION["panier"]);
+  }
+
+  if (!isset($_SESSION["panier"]) || count($_SESSION["panier"]) == 0) {
+    unset($_SESSION["panier"]);
+    unset($_SESSION["sejour"]);
+  }
+
+  header("Location: ../panier.php");
+  exit();
+}
+
+if (isset($_POST["vider_panier"])) {
+  unset($_SESSION["panier"]);
+  unset($_SESSION["sejour"]);
+  header("Location: ../panier.php");
+  exit();
+}
 
 if (isset($_POST["ajouter_panier"])) {
   $destination = isset($_POST["destination"]) ? $_POST["destination"] : "";
@@ -68,6 +92,8 @@ if (isset($_POST["ajouter_panier"])) {
 
   if (empty($date_depart)) {
     $error .= "La date de départ est requise.<br>";
+  } elseif ($date_depart < date("Y-m-d")) {
+    $error .= "La date de départ ne peut pas être dans le passé.<br>";
   }
 
   if ($personnes <= 0) {
@@ -93,10 +119,16 @@ if (isset($_POST["ajouter_panier"])) {
 
     if (!$transport_db) {
       $error .= "Le transport choisi n'est pas valide pour cette destination.<br>";
+    } elseif ((int) $transport_db["places"] < $personnes) {
+      $error .= "Il n'y a pas assez de places disponibles pour ce transport.<br>";
+    } elseif (!empty($transport_db["date_depart"]) && $transport_db["date_depart"] != $date_depart) {
+      $error .= "La date choisie ne correspond pas à la date du transport disponible.<br>";
     }
 
     if (!$hebergement_db) {
       $error .= "L'hébergement choisi n'est pas valide pour cette destination.<br>";
+    } elseif ((int) $hebergement_db["capacite"] < $personnes) {
+      $error .= "La capacité de l'hébergement est insuffisante.<br>";
     }
 
     if (!empty($activite)) {
@@ -104,6 +136,8 @@ if (isset($_POST["ajouter_panier"])) {
 
       if (!$activite_db) {
         $error .= "L'activité choisie n'est pas valide pour cette destination.<br>";
+      } elseif ((int) $activite_db["places"] < $personnes) {
+        $error .= "L'activité n'a plus assez de places disponibles.<br>";
       }
     }
   }
