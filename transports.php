@@ -1,17 +1,23 @@
 <?php
+header("Content-Type: text/html; charset=UTF-8");
 require_once "Fichiers PHP/config.php";
+
+function e($texte) {
+  return htmlspecialchars($texte, ENT_QUOTES, "UTF-8");
+}
 
 $transports = array();
 $destinations = array();
-$depart = isset($_GET["depart"]) ? $_GET["depart"] : "";
-$destinationChoisie = isset($_GET["destination"]) ? $_GET["destination"] : "";
-$date_depart = isset($_GET["date_depart"]) ? $_GET["date_depart"] : "";
+$depart = isset($_GET["depart"]) ? trim($_GET["depart"]) : "";
+$destinationChoisie = isset($_GET["destination"]) ? trim($_GET["destination"]) : "";
+$date_depart = isset($_GET["date_depart"]) ? trim($_GET["date_depart"]) : "";
 
 if ($conn) {
-  $resultat_destinations = mysqli_query($conn, "SELECT nom FROM destinations WHERE statut = 'validee' ORDER BY nom");
-  if ($resultat_destinations) {
-    while ($ligne = mysqli_fetch_assoc($resultat_destinations)) {
-      $destinations[] = $ligne;
+  $resultatDestinations = mysqli_query($conn, "SELECT nom FROM destinations WHERE statut = 'validee' ORDER BY nom");
+
+  if ($resultatDestinations) {
+    while ($ligne = mysqli_fetch_assoc($resultatDestinations)) {
+      $destinations[] = $ligne["nom"];
     }
   }
 
@@ -23,8 +29,8 @@ if ($conn) {
           AND (? = '' OR t.date_depart = ?)
           ORDER BY t.date_depart, d.nom";
   $stmt = mysqli_prepare($conn, $sql);
-  $depart_like = "%" . $depart . "%";
-  mysqli_stmt_bind_param($stmt, "ssssss", $depart, $depart_like, $destinationChoisie, $destinationChoisie, $date_depart, $date_depart);
+  $departLike = "%" . $depart . "%";
+  mysqli_stmt_bind_param($stmt, "ssssss", $depart, $departLike, $destinationChoisie, $destinationChoisie, $date_depart, $date_depart);
   mysqli_stmt_execute($stmt);
   $resultat = mysqli_stmt_get_result($stmt);
 
@@ -33,6 +39,48 @@ if ($conn) {
       $transports[] = $ligne;
     }
   }
+}
+
+if (count($destinations) == 0) {
+  $destinations = array("Paris", "Nice", "Lyon");
+}
+
+$champDepart = '<input type="text" id="depart" name="depart" placeholder="Exemple : Toulouse" value="' . e($depart) . '">';
+$champDate = '<input type="date" id="date_depart" name="date_depart" value="' . e($date_depart) . '">';
+
+$selectDestinations = '<select id="destination" name="destination">';
+$selectDestinations .= '<option value="">Choisir une destination</option>';
+
+foreach ($destinations as $destination) {
+  $selected = "";
+
+  if ($destinationChoisie == $destination) {
+    $selected = " selected";
+  }
+
+  $selectDestinations .= '<option value="' . e($destination) . '"' . $selected . '>' . e($destination) . '</option>';
+}
+
+$selectDestinations .= '</select>';
+
+$lignesTransports = "";
+
+foreach ($transports as $transport) {
+  $lignesTransports .= '<tr>';
+  $lignesTransports .= '<td>' . e($transport["type_transport"]) . '</td>';
+  $lignesTransports .= '<td>' . e($transport["destination"]) . '</td>';
+  $lignesTransports .= '<td>' . e($transport["duree"]) . '</td>';
+  $lignesTransports .= '<td>' . e($transport["date_depart"]) . '</td>';
+  $lignesTransports .= '<td>' . e($transport["prix"]) . ' euros</td>';
+  $lignesTransports .= '<td>' . e($transport["places"]) . '</td>';
+  $lignesTransports .= '<td><a href="sejour.php">Sélectionner</a></td>';
+  $lignesTransports .= '</tr>';
+}
+
+$messageTransport = "";
+
+if (count($transports) == 0) {
+  $messageTransport = '<p class="info-box">Aucun transport ne correspond à la recherche.</p>';
 }
 ?>
 
@@ -75,20 +123,13 @@ if ($conn) {
       <img class="page-image" src="assets/images/transport-voyage.png" alt="Moyens de transport pour planifier un voyage">
       <form method="get" action="transports.php">
         <label for="depart">Ville de départ :</label>
-        <input type="text" id="depart" name="depart" placeholder="Exemple : Toulouse" value="<?php echo htmlspecialchars($depart); ?>">
+        <?php echo $champDepart; ?>
 
         <label for="destination">Destination :</label>
-        <select id="destination" name="destination">
-          <option value="">Choisir une destination</option>
-          <?php foreach ($destinations as $destination) { ?>
-            <option value="<?php echo htmlspecialchars($destination["nom"]); ?>" <?php if ($destinationChoisie == $destination["nom"]) { echo "selected"; } ?>>
-              <?php echo htmlspecialchars($destination["nom"]); ?>
-            </option>
-          <?php } ?>
-        </select>
+        <?php echo $selectDestinations; ?>
 
         <label for="date_depart">Date de départ :</label>
-        <input type="date" id="date_depart" name="date_depart" value="<?php echo htmlspecialchars($date_depart); ?>">
+        <?php echo $champDate; ?>
 
         <button type="submit">Rechercher</button>
       </form>
@@ -106,22 +147,10 @@ if ($conn) {
           <th>Places</th>
           <th>Action</th>
         </tr>
-        <?php foreach ($transports as $transport) { ?>
-          <tr>
-            <td><?php echo htmlspecialchars($transport["type_transport"]); ?></td>
-            <td><?php echo htmlspecialchars($transport["destination"]); ?></td>
-            <td><?php echo htmlspecialchars($transport["duree"]); ?></td>
-            <td><?php echo htmlspecialchars($transport["date_depart"]); ?></td>
-            <td><?php echo htmlspecialchars($transport["prix"]); ?> euros</td>
-            <td><?php echo htmlspecialchars($transport["places"]); ?></td>
-            <td><a href="sejour.php">Sélectionner</a></td>
-          </tr>
-        <?php } ?>
+        <?php echo $lignesTransports; ?>
       </table>
 
-      <?php if (count($transports) == 0) { ?>
-        <p class="info-box">Aucun transport ne correspond à la recherche.</p>
-      <?php } ?>
+      <?php echo $messageTransport; ?>
     </section>
   </main>
 
